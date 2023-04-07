@@ -47,7 +47,7 @@ struct Color {
     uint32_t getInt() const;
 };
 
-
+Color parseRGBA(const std::string& css_str, bool& isValid);
 Color parse(const std::string& css_str, bool& isValid);
 Color parse(const std::string& css_str);
 

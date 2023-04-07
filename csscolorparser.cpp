@@ -271,6 +271,65 @@ void skip_whitespace(const std::string& text, size_t& pos, size_t end){
     }
 }
 
+Color parseHexRGBA(const std::string& css_str, size_t pos, size_t end, bool& valid) {
+    int read = 0;
+    int64_t iv = parse_int(css_str, pos, read, 16);
+    if (iv < 0) {
+        // Invalid: out of range.
+        return {};
+    }
+
+    pos += read;
+    skip_whitespace(css_str, pos, end);
+    if (pos != end) {
+        // Invalid: contains trailing chars.
+        return {};
+    }
+
+    if (read == 3) { // rgb
+        if (iv <= 0xfff) {
+            valid = true;
+            return {
+                static_cast<uint8_t>(((iv & 0xf00) >> 4) | ((iv & 0xf00) >> 8)),
+                static_cast<uint8_t>((iv & 0xf0) | ((iv & 0xf0) >> 4)),
+                static_cast<uint8_t>((iv & 0xf) | ((iv & 0xf) << 4)),
+                1
+            };
+        }
+    } else if (read == 6) { // rrggbb
+        if (iv <= 0xffffff) {
+            valid = true;
+            return {
+                static_cast<uint8_t>((iv & 0xff0000) >> 16),
+                static_cast<uint8_t>((iv & 0xff00) >> 8),
+                static_cast<uint8_t>(iv & 0xff),
+                1
+             };
+        }
+    } else if (read == 4) { // rgba
+        if (iv <= 0xffff) {
+            valid = true;
+            return {
+                static_cast<uint8_t>(((iv & 0xf000) >> 8) | ((iv & 0xf000) >> 12)),
+                static_cast<uint8_t>(((iv & 0xf00) >> 4)| ((iv & 0xf00) >> 8)),
+                static_cast<uint8_t>((iv & 0xf0) | ((iv & 0xf0) >> 4)),
+                static_cast<uint8_t>(iv & 0xf) / 255.0f,
+            };
+        }
+    } else if (read == 8) { // rrggbbaa
+        if (iv <= 0xffffffff) {
+            valid = true;
+            return {
+                static_cast<uint8_t>((iv & 0xff000000) >> 24),
+                static_cast<uint8_t>((iv & 0xff0000) >> 16),
+                static_cast<uint8_t>((iv & 0xff00) >> 8),
+                static_cast<uint8_t>(iv & 0xff) / 255.0f,
+            };
+        }
+    }
+    return {};
+}
+
 Color parseHexRGB(const std::string& css_str, size_t pos, size_t end, bool& valid) {
     int read = 0;
     int64_t iv = parse_int(css_str, pos, read, 16);
@@ -456,6 +515,39 @@ uint32_t CSSColorParser::Color::getInt() const {
 Color CSSColorParser::parse(const std::string& css_str) {
     bool valid;
     return parse(css_str, valid);
+}
+
+Color CSSColorParser::parseRGBA(const std::string& css_str, bool& valid) {
+    valid = false;
+
+    size_t pos = 0;
+    size_t end = css_str.length();
+
+    skip_whitespace(css_str, pos, end);
+    if (pos == end) {
+        return {};
+    }
+
+    switch(css_str[pos]) {
+        case '#':
+            return parseHexRGBA(css_str, pos+1, end, valid);
+
+        case 'r':
+        case 'R':
+            if (match("rgb", css_str, pos, end)) {
+                return parseRGB(css_str, pos, end, valid);
+            }
+            break;
+
+        case 'h':
+        case 'H':
+            if (match("hsl", css_str, pos, end)) {
+                return parseHSL(css_str, pos, end, valid);
+            }
+            break;
+    }
+
+    return parseNamedColor(css_str, pos, end, valid);
 }
 
 Color CSSColorParser::parse(const std::string& css_str, bool& valid) {
